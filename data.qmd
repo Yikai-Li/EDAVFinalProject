@@ -2,4 +2,6 @@
 
 ## Description
 
+The data set we use in this study is from "The influence of active video game play upon physical activity and screen-based activities in sedentary children" published by Department of Agriculture on DATA.GOV (https://catalog.data.gov/dataset/data-from-the-influence-of-active-video-game-play-upon-physical-activity-and-screen-based--33694). The data were collected from children who wer instructed to fill-out describing the previous day's activities at baseline, 2, 4, 6 and 10 weeks. 
+
 ## Missing value analysis
