@@ -1,6 +1,6 @@
 # Data
 
-```{r}
+```{r, include = FALSE}
 library(readxl)
 library(dplyr)
 library(tidyr)
@@ -19,11 +19,11 @@ liking_raw    <- read_excel("data/raw/liking_data.xlsx")
 
 We draw on three main datasets from the project “The influence of active video game play upon physical activity and screen-based activities in sedentary children”, published by the U.S. Department of Agriculture and available on DATA.GOV. 
 
-The data are provided in CSV and Excel formats and are static, with the last metadata update on June 5, 2025. The demographics dataset (52 rows × 8 columns) includes measured and self-reported information such as height, weight, birth year, and ethnicity. The liking dataset (151 × 7) contains children’s self-reported ratings (1–10) of how much they enjoy various physical and sedentary activities at baseline, week 6, and week 10. The ActiGraph dataset (1,536 × 15) is collected using wearable accelerometer devices and provides objective, high-resolution physical activity data over multiple time points. While the data quality is generally strong, with most participants having complete records, some minor missing values appear in the liking data. A potential limitation is the reliance on self-reported responses for some variables, which may introduce bias.
+The data are provided in CSV and Excel formats and are static, with the last metadata update on June 5, 2025. The demographics dataset (52 rows × 8 columns) includes measured and self-reported information such as height, weight, birth year, and ethnicity. The liking dataset (151 × 7) contains children’s self-reported ratings (1–10) of how much they enjoy various physical and sedentary activities at baseline, week 6, and week 10. Also, there is group when group = 0, kids need to play the games chosen my parents. When group = 1, they have autonomy and can choose their own game to play. The ActiGraph dataset (1,536 × 15) is collected using wearable accelerometer devices and provides objective, high-resolution physical activity data over multiple time points. While the data quality is generally strong, with most participants having complete records, some minor missing values appear in the liking data. A potential limitation is the reliance on self-reported responses for some variables, which may introduce bias.
 
 ## Missing value analysis
 
-```{r}
+```{r, echo = FALSE}
 missing_by_column <- function(df) {
   df |> 
     summarise(across(everything(), ~ sum(is.na(.)))) |> 
@@ -296,4 +296,79 @@ ggplot(liking_miss_agg_long,
 ```
 From the graph we can tell that Almost all kids (96.7%) have full data. The few missing values show up in the liking scores (like AVG_S, AVG_T, Sed), not in group or ID info. So maybe some kids skipped questions. 
 
+
+## Data Cleaning
+```{r}
+library(readxl)
+library(tidyverse)
+library(lubridate)
+library(janitor)
+library(skimr)
+
+actigraph_raw <- actigraph_raw <- read_excel("data/raw/actigraph_activity_data.xlsx",
+                                             sheet = "WORKSET"
+                                             )
+demo_raw      <- read_excel("data/raw/Demographics_(Birthdate-Year).xlsx")
+liking_raw    <- read_excel("data/raw/liking_data.xlsx")
+```
+
+
+```{r}
+# Clean demographic data
+
+
+clean_demo <- demo_raw |>
+  janitor::clean_names() |>  # Standardize column names to snake_case
+  mutate(
+    # Extract numeric ID from 'vol' column by removing "406-"
+    participant_id = as.numeric(gsub("406-", "", vol)),
+
+    # Convert birthdate string to numeric birth year
+    birth_year = as.numeric(birthdate)
+  ) |>
+  relocate(participant_id, .before = 1) |>  # Move participant_id to first column
+  select(-withdrawal_date, -ethnic_desc, -birthdate, -vol) |>  # Drop unneeded columns
+  arrange(participant_id)  # Optional: sort by participant ID
+
+# View summary statistics to check structure and missingness
+skimr::skim(clean_demo)
+
+write_csv(clean_demo, "data/clean/clean_demo.csv")
+
+```
+
+```{r}
+# Clean and filter ActiGraph data
+
+clean_actigraph <- actigraph_raw |>
+  janitor::clean_names() |>
+  mutate(
+    participant_id = str_remove(vol, "406-") |> as.numeric()
+  ) |>
+  select(-vol, -filename) |>
+  relocate(participant_id) |>
+  filter(if_all(everything(), ~ !is.na(.))) |>  # Remove rows with any missing values
+  arrange(participant_id, date)
+
+# Confirm missing data removed
+skimr::skim(clean_actigraph)
+
+write_csv(clean_actigraph, "data/clean/clean_actigraph.csv")
+```
+
+
+```{r}
+# Clean and process the data
+clean_liking <- liking_raw |>
+  janitor::clean_names() |>  # Convert column names to snake_case
+  mutate(
+    participant_id = as.numeric(gsub("406-", "", volunteer))  # Normalize participant ID
+  ) |>
+  select(participant_id, week, group, trad, avg_t, sed, avg_s) |>  # Reorder and select relevant columns
+  drop_na()  # Remove rows with any missing values
+skimr::skim(clean_liking)
+
+# Save the cleaned data
+write_csv(clean_liking, "data/clean/clean_liking.csv")
+```
 

@@ -1,1 +1,174 @@
 # Results
+```{r}
+# Load necessary libraries
+library(tidyverse)
+library(readr)
+library(lubridate)
+
+# Set path
+data_path <- "data/clean/"
+
+# Import cleaned data files
+actigraph_df <- read_csv(file.path(data_path, "clean_actigraph.csv"))
+demo_df      <- read_csv(file.path(data_path, "clean_demo.csv"))
+liking_df    <- read_csv(file.path(data_path, "clean_liking.csv"))
+
+# Check structure
+glimpse(actigraph_df)
+glimpse(demo_df)
+glimpse(liking_df)
+
+```
+
+##Graph 1: Overall MVPA  (Moderate to Vigorous Physical Activity) Trend (Mean ± SE)
+```{r}
+# Aggregate average MVPA by date
+mvpa_by_date <- actigraph_df |>
+  group_by(date) |>
+  summarise(
+    mean_mvpa = mean(mvpa, na.rm = TRUE),
+    sd_mvpa = sd(mvpa, na.rm = TRUE),
+    n = n(),
+    se_mvpa = sd_mvpa / sqrt(n)
+  )
+
+mvpa_by_date_clean <- mvpa_by_date |> 
+  filter(!is.na(se_mvpa))
+
+# Plot
+ggplot(mvpa_by_date, aes(x = date, y = mean_mvpa)) +
+  geom_line(color = "#0072B9", size = 1.2) +
+  geom_ribbon(
+    aes(ymin = pmax(mean_mvpa - se_mvpa, 0), ymax = mean_mvpa + se_mvpa),
+    alpha = 0.2,
+    fill = "red"
+  ) +
+  labs(
+    title = "Average MVPA Over Time",
+    x = "Date",
+    y = "Mean MVPA (minutes)"
+  ) +
+  theme_minimal()
+
+
+
+
+```
+
+This graph shows how participants’ average daily moderate-to-vigorous physical activity (MVPA) changed over the full study period. While there’s a lot of day-to-day variation, we can see some general ups and downs that might reflect seasonal changes — like people being more active during warmer months and less so in the winter.
+
+That said, this plot alone doesn’t offer conclusive evidence about the video game's impact on physical activity. However, it gives us a useful overall picture of how MVPA fluctuated throughout the study period. To better assess potential effects of gameplay, we’ll next look at changes in MVPA across defined timepoints — from baseline to later weeks.
+
+
+
+##Graph2: MVPA Distribution by Timepoint (week)
+```{r}
+actigraph_df <- actigraph_df |>
+  mutate(timepoint = factor(timepoint, levels = c("baseline", "week1", "week3", "week6", "week10")))
+
+# Create boxplot
+ggplot(actigraph_df, aes(x = timepoint, y = mvpa)) +
+  geom_boxplot(fill = "#69b3a2", alpha = 0.8, outlier.shape = 16, outlier.size = 1.5) +
+  labs(
+    title = "MVPA Distribution by Timepoint",
+    x = "Timepoint",
+    y = "MVPA (minutes/day)"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+This boxplot illustrates the distribution of daily MVPA across all five timepoints: baseline, week1, week3, week6, and week10. The median MVPA remains relatively consistent over time, with only slight fluctuations, suggesting no major shifts in overall group activity. The interquartile range is stable, and the presence of outliers at each timepoint indicates that while some individuals had very high activity levels, most participants clustered within a similar range. While we can’t conclude strong effects from this plot alone, the consistency across timepoints suggests that, at the group level, MVPA did not markedly increase or decrease throughout the study.
+
+##Graph 3:  Stacked Activity Composition (Sedentary → Vigorous)
+```{r}
+
+# Summarize average activity per timepoint
+composition_df <- actigraph_df |>
+  group_by(timepoint) |>
+  summarise(
+    sedentary = mean(sedentary, na.rm = TRUE),
+    light = mean(light, na.rm = TRUE),
+    moderate = mean(moderate, na.rm = TRUE),
+    vigorous = mean(vigorous, na.rm = TRUE)
+  )
+
+# Ensure timepoint is an ordered factor
+composition_df <- composition_df |>
+  mutate(timepoint = factor(timepoint, levels = c("baseline", "week1", "week3", "week6", "week10")))
+
+# Pivot to long format
+composition_long <- composition_df |>
+  pivot_longer(cols = c(sedentary, light, moderate, vigorous),
+               names_to = "activity_type",
+               values_to = "minutes")
+
+ggplot(composition_long, aes(x = timepoint, y = minutes, fill = activity_type, group = activity_type)) +
+  geom_area(position = "stack", alpha = 0.8) +
+  labs(
+    title = "Stacked Activity Composition Over Time",
+    x = "Timepoint",
+    y = "Minutes per Day"
+  ) +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal()
+
+
+```
+
+From this graph, we observe a slight increase in participants’ sedentary behavior over time, while moderate, light, and vigorous activity levels remained relatively stable. From the graph, we find that active games has minimal effect on improving participants' activity time. Participants' sedentary time increased as they play active games.
+
+##Graph 4: Individual MVPA Trajectories (Spaghetti Plot)
+
+```{r}
+ggplot(actigraph_df, aes(x = timepoint, y = mvpa, group = participant_id)) +
+  geom_line(alpha = 0.2, color = "#0072B2") +
+  stat_summary(aes(group = 1), fun = mean, geom = "line", color = "red", size = 1.2) +
+  labs(
+    title = "Individual MVPA Trajectories Over Time",
+    x = "Timepoint",
+    y = "MVPA (minutes/day)"
+  ) +
+  theme_minimal()
+```
+
+In this graph, the mean MVPA (red line) shows only minimal fluctuation across timepoints, indicating that, on average, participants did not significantly increase their MVPA. While a few individuals exhibited spikes or drops in activity, most participants remained consistently below 50 minutes per day.
+
+These results suggest that the intervention (e.g., active games or engagement strategy) had limited effect in shifting daily MVPA levels. The relatively flat group mean trend implies that participants maintained similar activity patterns throughout the study.
+
+
+##Graph 5: Change in MVPA from the baseline (grouped by groups -- difference autonomy of choosing games)
+```{r}
+
+mvpa_change_df <- actigraph_df |>
+  left_join(liking_df |> select(participant_id, group), by = "participant_id") |>
+  mutate(
+    timepoint = factor(timepoint, levels = c("baseline", "week1", "week3", "week6", "week10")),
+    group = factor(group, levels = c(0, 1), 
+                   labels = c("Rule-Followers (Low Autonomy)", "Choosers (High Autonomy)"))
+  )
+
+# Compute baseline MVPA
+baseline_df <- mvpa_change_df |>
+  filter(timepoint == "baseline") |>
+  group_by(participant_id) |>
+  summarise(baseline_mvpa = mean(mvpa, na.rm = TRUE), .groups = "drop")
+
+# Calculate change from baseline
+mvpa_change_df <- mvpa_change_df |>
+  left_join(baseline_df, by = "participant_id") |>
+  mutate(delta_mvpa = mvpa - baseline_mvpa)
+
+# Plot
+ggplot(mvpa_change_df, aes(x = timepoint, y = delta_mvpa)) +
+  geom_jitter(aes(color = group), width = 0.2, alpha = 0.6, size = 1.5) +
+  stat_summary(fun = mean, geom = "line", aes(group = group, color = group), linewidth = 1.2) +
+  stat_summary(fun.data = mean_se, geom = "errorbar", aes(group = group, color = group), width = 0.2) +
+  labs(
+    title = "Change in MVPA From Baseline",
+    x = "Timepoint",
+    y = "Δ MVPA (minutes per day)",
+    color = "Group"
+  ) +
+  theme_minimal()
+```
+The graph shows that across all follow-up timepoints (weeks 1, 3, 6, and 10), the average change in MVPA for both groups remained close to zero. Participants with high autonomy has slightly higher average change in MVPA compared to rule followers.However, the incrase wasn't significant enough to conclude intervention lead to improvement in MVPA.
