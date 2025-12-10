@@ -1,5 +1,5 @@
 # Results
-```{r}
+```{r. results = hide}
 # Load necessary libraries
 library(tidyverse)
 library(readr)
