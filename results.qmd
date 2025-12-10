@@ -1,9 +1,10 @@
 # Results
-```{r. results = hide}
+```{r, include=FALSE}
 # Load necessary libraries
 library(tidyverse)
 library(readr)
 library(lubridate)
+library(dplyr)
 
 # Set path
 data_path <- "data/clean/"
@@ -24,8 +25,8 @@ glimpse(liking_df)
 ```{r}
 # Aggregate average MVPA by date
 mvpa_by_date <- actigraph_df |>
-  group_by(date) |>
-  summarise(
+  dplyr::group_by(date) |>
+  dplyr::summarise(
     mean_mvpa = mean(mvpa, na.rm = TRUE),
     sd_mvpa = sd(mvpa, na.rm = TRUE),
     n = n(),
@@ -84,8 +85,8 @@ This boxplot illustrates the distribution of daily MVPA across all five timepoin
 
 # Summarize average activity per timepoint
 composition_df <- actigraph_df |>
-  group_by(timepoint) |>
-  summarise(
+  dplyr::group_by(timepoint) |>
+  dplyr::summarise(
     sedentary = mean(sedentary, na.rm = TRUE),
     light = mean(light, na.rm = TRUE),
     moderate = mean(moderate, na.rm = TRUE),
@@ -150,8 +151,8 @@ mvpa_change_df <- actigraph_df |>
 # Compute baseline MVPA
 baseline_df <- mvpa_change_df |>
   filter(timepoint == "baseline") |>
-  group_by(participant_id) |>
-  summarise(baseline_mvpa = mean(mvpa, na.rm = TRUE), .groups = "drop")
+  dplyr::group_by(participant_id) |>
+  dplyr::summarise(baseline_mvpa = mean(mvpa, na.rm = TRUE), .groups = "drop")
 
 # Calculate change from baseline
 mvpa_change_df <- mvpa_change_df |>
