@@ -14,9 +14,6 @@ demo_raw      <- read_excel("data/raw/Demographics_(Birthdate-Year).xlsx")
 liking_raw    <- read_excel("data/raw/liking_data.xlsx")
 ```
 
-```{r}
-liking_raw
-```
 
 ## Description
 
@@ -50,6 +47,19 @@ missing_liking
 
 ```{r}
 # Build aggregated missing-pattern table with ATOMIC values
+
+act_miss_long <- actigraph_raw |>
+  mutate(row_id = row_number()) |>
+  select(row_id, where(is.numeric)) |>
+  pivot_longer(
+    cols = -row_id,
+    names_to = "variable",
+    values_to = "value"
+  ) |>
+  mutate(missing = if_else(is.na(value), 1, 0))
+
+
+
 act_miss_agg <- act_miss_long |>
   select(row_id, variable, missing) |>
   pivot_wider(
