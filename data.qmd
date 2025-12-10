@@ -297,8 +297,8 @@ ggplot(liking_miss_agg_long,
 From the graph we can tell that Almost all kids (96.7%) have full data. The few missing values show up in the liking scores (like AVG_S, AVG_T, Sed), not in group or ID info. So maybe some kids skipped questions. 
 
 
-## Data Cleaning
-```{r}
+Data Cleaning
+```{r, include = FALSE}
 library(readxl)
 library(tidyverse)
 library(lubridate)
@@ -313,7 +313,7 @@ liking_raw    <- read_excel("data/raw/liking_data.xlsx")
 ```
 
 
-```{r}
+```{r, results = 'hide'}
 # Clean demographic data
 
 
@@ -337,7 +337,7 @@ write_csv(clean_demo, "data/clean/clean_demo.csv")
 
 ```
 
-```{r}
+```{r, results='hide'}
 # Clean and filter ActiGraph data
 
 clean_actigraph <- actigraph_raw |>
@@ -357,7 +357,7 @@ write_csv(clean_actigraph, "data/clean/clean_actigraph.csv")
 ```
 
 
-```{r}
+```{r, results='hide'}
 # Clean and process the data
 clean_liking <- liking_raw |>
   janitor::clean_names() |>  # Convert column names to snake_case

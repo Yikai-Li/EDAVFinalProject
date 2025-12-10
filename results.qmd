@@ -21,7 +21,7 @@ glimpse(liking_df)
 
 ```
 
-##Graph 1: Overall MVPA  (Moderate to Vigorous Physical Activity) Trend (Mean ± SE)
+## Graph 1: Overall MVPA  (Moderate to Vigorous Physical Activity) Trend (Mean ± SE)
 ```{r}
 # Aggregate average MVPA by date
 mvpa_by_date <- actigraph_df |>
@@ -62,7 +62,7 @@ That said, this plot alone doesn’t offer conclusive evidence about the video g
 
 
 
-##Graph2: MVPA Distribution by Timepoint (week)
+## Graph2: MVPA Distribution by Timepoint (week)
 ```{r}
 actigraph_df <- actigraph_df |>
   mutate(timepoint = factor(timepoint, levels = c("baseline", "week1", "week3", "week6", "week10")))
@@ -80,7 +80,7 @@ ggplot(actigraph_df, aes(x = timepoint, y = mvpa)) +
 
 This boxplot illustrates the distribution of daily MVPA across all five timepoints: baseline, week1, week3, week6, and week10. The median MVPA remains relatively consistent over time, with only slight fluctuations, suggesting no major shifts in overall group activity. The interquartile range is stable, and the presence of outliers at each timepoint indicates that while some individuals had very high activity levels, most participants clustered within a similar range. While we can’t conclude strong effects from this plot alone, the consistency across timepoints suggests that, at the group level, MVPA did not markedly increase or decrease throughout the study.
 
-##Graph 3:  Stacked Activity Composition (Sedentary → Vigorous)
+## Graph 3:  Stacked Activity Composition (Sedentary → Vigorous)
 ```{r}
 
 # Summarize average activity per timepoint
@@ -118,7 +118,7 @@ ggplot(composition_long, aes(x = timepoint, y = minutes, fill = activity_type, g
 
 From this graph, we observe a slight increase in participants’ sedentary behavior over time, while moderate, light, and vigorous activity levels remained relatively stable. From the graph, we find that active games has minimal effect on improving participants' activity time. Participants' sedentary time increased as they play active games.
 
-##Graph 4: Individual MVPA Trajectories (Spaghetti Plot)
+## Graph 4: Individual MVPA Trajectories (Spaghetti Plot)
 
 ```{r}
 ggplot(actigraph_df, aes(x = timepoint, y = mvpa, group = participant_id)) +
@@ -137,7 +137,7 @@ In this graph, the mean MVPA (red line) shows only minimal fluctuation across ti
 These results suggest that the intervention (e.g., active games or engagement strategy) had limited effect in shifting daily MVPA levels. The relatively flat group mean trend implies that participants maintained similar activity patterns throughout the study.
 
 
-##Graph 5: Change in MVPA from the baseline (grouped by groups -- difference autonomy of choosing games)
+## Graph 5: Change in MVPA from the baseline (grouped by groups -- difference autonomy of choosing games)
 ```{r}
 
 mvpa_change_df <- actigraph_df |>
