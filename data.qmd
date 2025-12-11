@@ -12,6 +12,7 @@ actigraph_raw <- actigraph_raw <- read_excel("data/raw/actigraph_activity_data.x
                                              )
 demo_raw      <- read_excel("data/raw/Demographics_(Birthdate-Year).xlsx")
 liking_raw    <- read_excel("data/raw/liking_data.xlsx")
+questionnaires_raw    <- read_excel("data/raw/questionnaires.xlsx")
 ```
 
 
@@ -19,7 +20,7 @@ liking_raw    <- read_excel("data/raw/liking_data.xlsx")
 
 We draw on three main datasets from the project “The influence of active video game play upon physical activity and screen-based activities in sedentary children”, published by the U.S. Department of Agriculture and available on DATA.GOV. 
 
-The data are provided in CSV and Excel formats and are static, with the last metadata update on June 5, 2025. The demographics dataset (52 rows × 8 columns) includes measured and self-reported information such as height, weight, birth year, and ethnicity. The liking dataset (151 × 7) contains children’s self-reported ratings (1–10) of how much they enjoy various physical and sedentary activities at baseline, week 6, and week 10. Also, there is group when group = 0, kids need to play the games chosen my parents. When group = 1, they have autonomy and can choose their own game to play. The ActiGraph dataset (1,536 × 15) is collected using wearable accelerometer devices and provides objective, high-resolution physical activity data over multiple time points. While the data quality is generally strong, with most participants having complete records, some minor missing values appear in the liking data. A potential limitation is the reliance on self-reported responses for some variables, which may introduce bias.
+The data are provided in CSV and Excel formats and are static, with the last metadata update on June 5, 2025. The demographics dataset (52 rows × 8 columns) includes measured and self-reported information such as height, weight, birth year, and ethnicity. The liking dataset (151 × 7) contains children’s self-reported ratings (1–10) of how much they enjoy various physical and sedentary activities at baseline, week 6, and week 10. Also, there is group when group = 0, kids need to play the games chosen by parents. When group = 1, they have autonomy and can choose their own game to play. The ActiGraph dataset (1,536 × 15) is collected using wearable accelerometer devices and provides objective, high-resolution physical activity data over multiple time points. While the data quality is generally strong, with most participants having complete records, some minor missing values appear in the liking data. A potential limitation is the reliance on self-reported responses for some variables, which may introduce bias.
 
 ## Missing value analysis
 
@@ -39,10 +40,12 @@ missing_by_column <- function(df) {
 missing_actigraph <- missing_by_column(actigraph_raw)
 missing_demo      <- missing_by_column(demo_raw)
 missing_liking    <- missing_by_column(liking_raw)
+missing_questionnaires    <- missing_by_column(questionnaires_raw)
 
 missing_actigraph
 missing_demo
 missing_liking
+missing_questionnaires
 ```
 
 ```{r}
@@ -296,6 +299,81 @@ ggplot(liking_miss_agg_long,
 ```
 From the graph we can tell that Almost all kids (96.7%) have full data. The few missing values show up in the liking scores (like AVG_S, AVG_T, Sed), not in group or ID info. So maybe some kids skipped questions. 
 
+```{r}
+
+questionnaires_miss_long <- questionnaires_raw |>
+  mutate(row_id = row_number()) |>
+  pivot_longer(
+    cols = c(Date, paste0("Q", 1:20)),
+    names_to = "variable",
+    values_to = "value",
+    values_transform = list(value = as.character)
+    ) |>
+  mutate(missing = as.numeric(is.na(value)))
+
+# Aggregate to identify all missingness patterns
+questionnaires_miss_agg <- questionnaires_miss_long |>
+  select(row_id, variable, missing) |>
+  pivot_wider(names_from = variable, values_from = missing, values_fn = max) |>
+  group_by(across(-row_id)) |>
+  summarise(n_rows = n(), .groups = "drop") |>
+  mutate(
+    pattern_id = row_number(),
+    percent = 100 * n_rows / sum(n_rows),
+    percent_label = paste0(round(percent, 1), "%"),
+    y_label_text = paste0(n_rows, " rows (", percent_label, ")") 
+  )
+
+# Create a lookup vector for the labels so ggplot knows 
+# that pattern_id 1 = "48 rows...", pattern_id 2 = "2 rows...", etc.
+y_label_map <- setNames(questionnaires_miss_agg$y_label_text, questionnaires_miss_agg$pattern_id) # <--- FIX
+
+# Convert back to long for plotting
+questionnaires_miss_agg_long <- questionnaires_miss_agg |>
+  pivot_longer(cols = -c(n_rows, percent, percent_label, pattern_id, y_label_text), # <--- FIX: include new cols
+               names_to = "variable",
+               values_to = "missing")
+
+# Get missing count per variable for plot ordering (Same as before)
+var_missing_order <- questionnaires_miss_long |>
+  group_by(variable) |>
+  summarise(var_missing = sum(missing), .groups = "drop")
+
+# Join order back
+questionnaires_miss_agg_long <- questionnaires_miss_agg_long |>
+  left_join(var_missing_order, by = "variable")
+
+# Plot
+ggplot(questionnaires_miss_agg_long,
+       aes(
+         x = reorder(variable, var_missing),
+         # <--- FIX: Map Y to the unique ID, but order by count (n_rows)
+         y = reorder(as.factor(pattern_id), n_rows), 
+         fill = as.factor(missing)
+       )) +
+  geom_tile(color = "white") +
+  # <--- FIX: Tell ggplot to use the text labels we created earlier
+  scale_y_discrete(labels = y_label_map) + 
+  scale_fill_manual(
+    values = c("0" = "grey90", "1" = "#6A51A3"),
+    labels = c("Present", "Missing")
+  ) +
+  labs(
+    title    = "Missingness Patterns in Demographics",
+    subtitle = "Each row is a unique pattern of missing vs present values",
+    x        = "Variable",
+    y        = "Pattern (rows and % of sample)",
+    fill     = "Data Status"
+  ) +
+  theme_bw(base_size = 16) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid  = element_blank()
+  )
+
+```
+
+From the above lists of missing values (here we show it again and take a closer look at the missing variables for questionnaires data), we can tell that few children didn't reply to several questions in the questionnaire while after taking a closer look at the original data, we found out the 3 students didn't reply to any questions in the questionnaire at 3 different dates. It's possible that they just didn't took the questionnaire and thus we remove the whole row as it doesn't given any useful information.
 
 Data Cleaning
 ```{r, include = FALSE}
@@ -370,5 +448,23 @@ skimr::skim(clean_liking)
 
 # Save the cleaned data
 write_csv(clean_liking, "data/clean/clean_liking.csv")
+```
+
+```{r, results='hide'}
+# Clean and process the data
+clean_questionnaires <- questionnaires_raw |>
+  janitor::clean_names() |>
+  mutate(
+    participant_id = as.numeric(gsub("406-", "", id)),
+    week = session # Normalize participant ID
+  )|>
+  select(participant_id, date, week, adaquate, predilec, enjoy, scale_tot, 
+         ada_m, pred_m, enjoy_m, scale_m) |>
+  drop_na()
+
+skimr::skim(clean_questionnaires)
+
+# Save the cleaned data
+write_csv(clean_questionnaires, "data/clean/clean_questionnaires.csv")
 ```
 
