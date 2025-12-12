@@ -5,6 +5,7 @@ library(tidyverse)
 library(readr)
 library(lubridate)
 library(dplyr)
+library(reshape2)
 
 # Set path
 data_path <- "data/clean/"
@@ -14,6 +15,7 @@ actigraph_df <- read_csv(file.path(data_path, "clean_actigraph.csv"))
 demo_df      <- read_csv(file.path(data_path, "clean_demo.csv"))
 liking_df    <- read_csv(file.path(data_path, "clean_liking.csv"))
 q_df         <- read_csv(file.path(data_path, "clean_questionnaires.csv"))
+avg_df       <- read_csv(file.path(data_path, "clean_recall.csv"))
 
 # Check structure
 glimpse(actigraph_df)
@@ -188,11 +190,49 @@ ggplot(mvpa_change_df, aes(x = timepoint, y = delta_mvpa)) +
 ```
 The graph shows that across all follow-up timepoints (weeks 1, 3, 6, and 10), the average change in MVPA for both groups remained close to zero. Participants with high autonomy has slightly higher average change in MVPA compared to rule followers.However, the increase wasn't significant enough to conclude intervention lead to improvement in MVPA.
 
-
-## Graph 7: Change in physical and sedentary activities V.S. Liking Ratings
+## Graph 7: Change MVPA V.S. Demographics
 
 ```{r}
-# Summarize activity per timepoint
+actid_df <- actigraph_df |>
+  mutate(week = timepoint) |>
+  select(!timepoint) |>
+  dplyr::group_by(participant_id) |>
+  dplyr::summarise(
+    mvpa = mean(mvpa)
+  )
+
+actid_df <- demo_df |> 
+  left_join(actid_df,
+            by = c("participant_id")) |>
+  drop_na() |> 
+  ungroup()
+
+actid_df_long <- actid_df |>
+  mutate(across(c(admitweight, admitheight, gender, race_desc, birth_year),
+                as.character)) |>
+  pivot_longer(
+    cols = c(admitweight, admitheight, gender, race_desc, birth_year),
+    names_to  = "demographic",
+    values_to = "demo_value"
+  )
+
+ggplot(actid_df_long, aes(x = demo_value, y = mvpa)) +
+  geom_point(alpha = 0.5) +
+  facet_wrap(~ demographic, scales = "free_x") +
+  labs(
+    title = "MVPA by Demographic Factors",
+    x = "Demographic value",
+    y = "MVPA (minutes/day)"
+  ) +
+  theme_minimal(base_size = 14)
+
+```
+
+From the graph we can observe that male children do tend to have more times in moderate and vigorous physical activities comparing to female children. There are too few data for other races besides white and thus we can't conclude a significant finding. The data also looks random for other variables. Hence, we conclude that gender might be the only important demographics variable that affects MVPA
+
+## Graph 8: Change in physical and sedentary activities V.S. Liking Ratings
+
+```{r}
 compid_df <- actigraph_df |>
   mutate(week = timepoint) |>
   select(!timepoint) |>
@@ -249,8 +289,8 @@ compliking_long <- compliking |>
     ),
     activity_type = recode(
       activity_type,
-      sedentary = "Sedentary activity",
-      active    = "Physical Activity"
+      sedentary = "Sedentary activities",
+      active    = "Physical Activities"
     )
   )
 
@@ -268,6 +308,69 @@ ggplot(compliking_long,
   theme_minimal(base_size = 14)
 ```
 
-In this graph, we focus on the liking data, which contains ratings of how children wanted to perform physical and sedentary activities on a scale of 1-10. We can observe from the graph that there exists a clear increasing trend for physical activities time as ratings of physical activities increases, meaning that children would do more physical activities if they like them more. We do observe that also the sedentary activities minutes decreases when the rating of physical activities changes from around 9 to 10, it's mainly at a constant time. This might indicate that except children who likes physical activities heavily, childrten tends to have similar physical activity time. 
+In this graph, we focus on the liking data, which contains ratings of how children wanted to perform physical and sedentary activities on a scale of 1-10. We can observe from the graph that there exists a clear increasing trend for physical activities time as ratings of physical activities increases, meaning that children would do more physical activities if they like them more. We do observe that also the sedentary activities minutes decreases when the rating of physical activities changes from around 9 to 10, it's mainly at a constant time. This might indicate that except children who likes physical activities heavily, children tends to have similar sedentary activities time. However, the trend for the sedentary liking rating graph is not that clear. We do observe that the sedentary activities time increases as rating increases from 6 to 7 and from 8 to 9, but it decreases from 5 to 6, 7 to 8 and 9 to 10. The points with a rating lower than 5 seems to be outliers. We also observe that there are fewer data at rating 8, where the physical activities time also behaves out of pattern as it tends to be decreasing as the sedentary liking rating increases but increases sharply at rating 8, which might indicate that the results at rating 8 is not that significant. Besides these cases, we can say that children are mostly honest and can mostly reflect themselves precisely. This means that we can trust their answers for questionnaires currently and future studies can investigate further upon results from the questionnaires.
+
+## Graph 9: Active Video Gaming Time by Timepoint
+
+```{r}
+avgw_df <- avg_df |>
+  mutate(participant_id = volunteer_number,
+         week = case_when(
+      week == "Baseline" ~ "bsl",
+      week == "1"    ~ "wk1",
+      week == "3"    ~ "wk3",
+      week == "6"    ~ "wk6",
+      week == "10"   ~ "wk10")) |>
+  mutate(week = factor(week, levels = c("bsl", "wk1", "wk3", "wk6", "wk10"))) |>
+  select(!c(volunteer_number, x10_1_how_much_time_did_you_spend_in_sports_active_games)) |>
+  ungroup()|>
+  group_by(week, participant_id)|>
+  dplyr::summarize(
+    mean_time = mean(time)
+  )
+
+ggplot(avgw_df, aes(x = week, y = mean_time)) +
+  geom_point(alpha = 0.6) +
+  labs(
+    title = "Active Video Gaming Time by Timepoint",
+    x = "Timepoint",
+    y = "Active Video Gaming Time (hours/day)"
+  ) +
+  theme_minimal(base_size = 14)+
+  scale_y_continuous(limits = c(0, 10))
+```
+
+From the graph, we can observe a clear similar trend as the one in Graph 2: MVPA by Timepoint, this indicates an association between Active Video Gaming Time (reported through questionnaires) and Moderate to Vigorous Physical Activity time.
+
+## Graph 10: MVPA by Active Video Games (AVG)
+
+```{r}
+actidw_df <- actigraph_df |>
+  mutate(week = timepoint) |>
+  select(!timepoint) |>
+  dplyr::group_by(participant_id, week) |>
+  dplyr::summarise(
+    mvpa = mean(mvpa)
+  )|>
+  mutate(week = case_when(
+      week == "baseline" ~ "bsl",
+      week == "week1"    ~ "wk1",
+      week == "week3"    ~ "wk3",
+      week == "week6"    ~ "wk6",
+      week == "week10"   ~ "wk10")) |>
+  mutate(week = factor(week, levels = c("bsl", "wk1", "wk3", "wk6", "wk10"))) |>
+  ungroup()
+
+q_df_c <- q_df |>
+  mutate(week = session) |>
+  select(!session)
+
+compq <- q_df_c |> 
+  left_join(actidw_df,
+            by = c("participant_id", "week")) |>
+  drop_na() |> 
+  ungroup()
+```
+
 
 

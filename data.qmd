@@ -12,7 +12,10 @@ actigraph_raw <- actigraph_raw <- read_excel("data/raw/actigraph_activity_data.x
                                              )
 demo_raw      <- read_excel("data/raw/Demographics_(Birthdate-Year).xlsx")
 liking_raw    <- read_excel("data/raw/liking_data.xlsx")
-questionnaires_raw    <- read_excel("data/raw/questionnaires.xlsx")
+questionnaires_raw      <- read_excel("data/raw/questionnaires.xlsx", sheet = 3)
+recall_raw    <- read_excel("data/raw/24_hour_recalldata.xlsx")[-1,]
+recall_raw <- recall_raw |>
+  select(`Volunteer Number:`, `Week:`, `(10.1)  How much time did you spend in Sports/Active Games?`)
 ```
 
 
@@ -304,7 +307,7 @@ From the graph we can tell that Almost all kids (96.7%) have full data. The few 
 questionnaires_miss_long <- questionnaires_raw |>
   mutate(row_id = row_number()) |>
   pivot_longer(
-    cols = c(Date, paste0("Q", 1:20)),
+    cols = c(Date, paste0("Q", 1:19)),
     names_to = "variable",
     values_to = "value",
     values_transform = list(value = as.character)
@@ -373,7 +376,7 @@ ggplot(questionnaires_miss_agg_long,
 
 ```
 
-From the above lists of missing values (here we show it again and take a closer look at the missing variables for questionnaires data), we can tell that few children didn't reply to several questions in the questionnaire while after taking a closer look at the original data, we found out the 3 students didn't reply to any questions in the questionnaire at 3 different dates. It's possible that they just didn't took the questionnaire and thus we remove the whole row as it doesn't given any useful information.
+From the above lists of missing values (here we show it again and take a closer look at the missing variables for questionnaires data), we can tell that few children didn't reply to several questions in the questionnaire while after taking a closer look at the original data, we found out that only 2 students didn't reply to more than half of the questions in the questionnaire at 2 different dates. Thus we remove the whole row as it doesn't give any useful information.
 
 Data Cleaning
 ```{r, include = FALSE}
@@ -456,10 +459,9 @@ clean_questionnaires <- questionnaires_raw |>
   janitor::clean_names() |>
   mutate(
     participant_id = as.numeric(gsub("406-", "", id)),
-    week = session # Normalize participant ID
+    week = session
   )|>
-  select(participant_id, date, week, adaquate, predilec, enjoy, scale_tot, 
-         ada_m, pred_m, enjoy_m, scale_m) |>
+  select(!paste0("q", 1:19)) |>
   drop_na()
 
 skimr::skim(clean_questionnaires)
@@ -467,4 +469,17 @@ skimr::skim(clean_questionnaires)
 # Save the cleaned data
 write_csv(clean_questionnaires, "data/clean/clean_questionnaires.csv")
 ```
+```{r, results='hide'}
+clean_recall <- recall_raw |>
+  janitor::clean_names()|>
+  mutate(
+    participant_id = volunteer_number,
+    week = week,
+    time = x10_1_how_much_time_did_you_spend_in_sports_active_games
+  )|>
+  drop_na()
 
+skimr::skim(clean_recall)
+
+write_csv(clean_recall, "data/clean/clean_recall.csv")
+```
