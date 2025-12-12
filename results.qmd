@@ -13,6 +13,7 @@ data_path <- "data/clean/"
 actigraph_df <- read_csv(file.path(data_path, "clean_actigraph.csv"))
 demo_df      <- read_csv(file.path(data_path, "clean_demo.csv"))
 liking_df    <- read_csv(file.path(data_path, "clean_liking.csv"))
+q_df         <- read_csv(file.path(data_path, "clean_questionnaires.csv"))
 
 # Check structure
 glimpse(actigraph_df)
@@ -60,9 +61,22 @@ This graph shows how participants’ average daily moderate-to-vigorous physical
 
 That said, this plot alone doesn’t offer conclusive evidence about the video game's impact on physical activity. However, it gives us a useful overall picture of how MVPA fluctuated throughout the study period. To better assess potential effects of gameplay, we’ll next look at changes in MVPA across defined timepoints — from baseline to later weeks.
 
+## Graph 2: MVPA Distribution by Total Minutes and Time point
+```{r}
+ggplot(actigraph_df, aes(x = minutes, y = mvpa)) +
+  geom_point(alpha = 0.35, color = "#1f77b4", size = 2) +
+  labs(
+    title = "Relationship Between Total Minutes and MVPA",
+    x = "Total Minutes per Day",
+    y = "MVPA Minutes per Day"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+From the data, we notice that there's a variable of total minutes a child wears the ActiGraph. At first glance, using MVPA/Total Minutes might me more suitable than using MVPA it self as the proportion of children taking MVPA of the child's total minutes tracked. Hence, to proceed with further analysis, we first ask the question that whether MVPA would be correlated with total minutes. Here we can tell that most children wear the ActiGraph whole day, which corresponds to 1440 minutes. Some children wear it around 750 minutes per day, which corresponds to around 12 hours, this is potentially due to children not wearing it during sleep time. The randomness of the MVPA for all total minutes per day, except for the left most few cases where the total minutes are too low, aligns with the hypothesis as sleeping time doesn't affec MVPA since children need to be awake to perform vigorous and moderate physical activities. Therefore, we can use MVPA directly moving forward in this study.
 
 
-## Graph2: MVPA Distribution by Timepoint (week)
+## Graph 3: MVPA Distribution by Timepoint (week)
 ```{r}
 actigraph_df <- actigraph_df |>
   mutate(timepoint = factor(timepoint, levels = c("baseline", "week1", "week3", "week6", "week10")))
@@ -80,7 +94,7 @@ ggplot(actigraph_df, aes(x = timepoint, y = mvpa)) +
 
 This boxplot illustrates the distribution of daily MVPA across all five timepoints: baseline, week1, week3, week6, and week10. The median MVPA remains relatively consistent over time, with only slight fluctuations, suggesting no major shifts in overall group activity. The interquartile range is stable, and the presence of outliers at each timepoint indicates that while some individuals had very high activity levels, most participants clustered within a similar range. While we can’t conclude strong effects from this plot alone, the consistency across timepoints suggests that, at the group level, MVPA did not markedly increase or decrease throughout the study.
 
-## Graph 3:  Stacked Activity Composition (Sedentary → Vigorous)
+## Graph 4:  Stacked Activity Composition (Sedentary → Vigorous)
 ```{r}
 
 # Summarize average activity per timepoint
@@ -118,7 +132,7 @@ ggplot(composition_long, aes(x = timepoint, y = minutes, fill = activity_type, g
 
 From this graph, we observe a slight increase in participants’ sedentary behavior over time, while moderate, light, and vigorous activity levels remained relatively stable. From the graph, we find that active games has minimal effect on improving participants' activity time. Participants' sedentary time increased as they play active games.
 
-## Graph 4: Individual MVPA Trajectories (Spaghetti Plot)
+## Graph 5: Individual MVPA Trajectories (Spaghetti Plot)
 
 ```{r}
 ggplot(actigraph_df, aes(x = timepoint, y = mvpa, group = participant_id)) +
@@ -137,7 +151,7 @@ In this graph, the mean MVPA (red line) shows only minimal fluctuation across ti
 These results suggest that the intervention (e.g., active games or engagement strategy) had limited effect in shifting daily MVPA levels. The relatively flat group mean trend implies that participants maintained similar activity patterns throughout the study.
 
 
-## Graph 5: Change in MVPA from the baseline (grouped by groups -- difference autonomy of choosing games)
+## Graph 6: Change in MVPA from the baseline (grouped by groups -- difference autonomy of choosing games)
 ```{r}
 
 mvpa_change_df <- actigraph_df |>
@@ -172,4 +186,88 @@ ggplot(mvpa_change_df, aes(x = timepoint, y = delta_mvpa)) +
   ) +
   theme_minimal()
 ```
-The graph shows that across all follow-up timepoints (weeks 1, 3, 6, and 10), the average change in MVPA for both groups remained close to zero. Participants with high autonomy has slightly higher average change in MVPA compared to rule followers.However, the incrase wasn't significant enough to conclude intervention lead to improvement in MVPA.
+The graph shows that across all follow-up timepoints (weeks 1, 3, 6, and 10), the average change in MVPA for both groups remained close to zero. Participants with high autonomy has slightly higher average change in MVPA compared to rule followers.However, the increase wasn't significant enough to conclude intervention lead to improvement in MVPA.
+
+
+## Graph 7: Change in physical and sedentary activities V.S. Liking Ratings
+
+```{r}
+# Summarize activity per timepoint
+compid_df <- actigraph_df |>
+  mutate(week = timepoint) |>
+  select(!timepoint) |>
+  dplyr::group_by(participant_id, week) |>
+  dplyr::summarise(
+    sedentary = mean(sedentary, na.rm = TRUE),
+    light = mean(light, na.rm = TRUE),
+    moderate = mean(moderate, na.rm = TRUE),
+    vigorous = mean(vigorous, na.rm = TRUE)
+  )
+
+
+compid_df <- compid_df |>
+  mutate(week = case_when(
+      week == "baseline" ~ "bsl",
+      week == "week1"    ~ "wk1",
+      week == "week3"    ~ "wk3",
+      week == "week6"    ~ "wk6",
+      week == "week10"   ~ "wk10")) |>
+  mutate(week = factor(week, levels = c("bsl", "wk1", "wk3", "wk6", "wk10"))) |>
+  ungroup()
+
+compliking <- liking_df |> 
+  left_join(compid_df,
+            by = c("participant_id", "week")) |>
+  drop_na() |> 
+  ungroup()
+
+compliking_long <- compliking |>
+  # combine all non-sedentary intensities into one "active" variable
+  mutate(active = light + moderate + vigorous) |>
+  select(participant_id, week, trad, sed, sedentary, active) |>
+  
+  # first pivot the two liking variables into one column
+  pivot_longer(
+    cols = c(trad, sed),
+    names_to = "liking_type",
+    values_to = "liking_score"
+  ) |>
+  
+  # then pivot the two activity variables into one column
+  pivot_longer(
+    cols = c(sedentary, active),
+    names_to = "activity_type",
+    values_to = "minutes"
+  ) |>
+  
+  # nice labels
+  mutate(
+    liking_type = recode(
+      liking_type,
+      trad = "Ratings of Physical Activities",
+      sed  = "Ratings of Sedentary Activities"
+    ),
+    activity_type = recode(
+      activity_type,
+      sedentary = "Sedentary activity",
+      active    = "Physical Activity"
+    )
+  )
+
+ggplot(compliking_long,
+       aes(x = liking_score, y = minutes, color = activity_type)) +
+  geom_point(alpha = 0.3) +
+  geom_smooth(method = "loess", se = FALSE, linewidth = 1.2) +
+  facet_wrap(~ liking_type, scales = "free_x") +
+  labs(
+    title = "Acitivities by Liking Ratings of Physical and Sedentary Activities",
+    x = "Liking Rating",
+    y = "Minutes per Day",
+    color = "Activity type"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+In this graph, we focus on the liking data, which contains ratings of how children wanted to perform physical and sedentary activities on a scale of 1-10. We can observe from the graph that there exists a clear increasing trend for physical activities time as ratings of physical activities increases, meaning that children would do more physical activities if they like them more. We do observe that also the sedentary activities minutes decreases when the rating of physical activities changes from around 9 to 10, it's mainly at a constant time. This might indicate that except children who likes physical activities heavily, childrten tends to have similar physical activity time. 
+
+
